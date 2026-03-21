@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { BookOpen, Volume2, Pause, Play } from "lucide-react";
 import { Button } from "./ui/button";

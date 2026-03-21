@@ -192,3 +192,7 @@
 html {
   font-size: var(--font-size);
 }
+
+main {
+  @apply flex-1;
+}

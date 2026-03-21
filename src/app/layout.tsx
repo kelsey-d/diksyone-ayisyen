@@ -26,13 +26,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-[#001669]`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-black flex flex-col`}
       >
         {/* Header */}
         <header
           className="text-white bg-[#001669] shadow-lg h-[25vh]"
           style={{
-            backgroundImage: `url(./blue-fish.png)`,
+            backgroundImage: `url(/images/blue-fish.png)`,
             backgroundBlendMode: "multiply",
             backgroundSize: "cover",
             backgroundPosition: "center",
@@ -52,7 +52,7 @@ export default function RootLayout({
         </header>
         {children}
         {/* Footer */}
-        <footer className="text-white mt-16">
+        <footer className="bg-[#001669] text-white">
           <div className="container mx-auto px-4 py-8">
             <div className="text-center space-y-4">
               <p className="text-lg">Fèt ak renmen pou kominote Ayisyen an</p>

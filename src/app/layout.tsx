@@ -26,11 +26,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-black flex flex-col`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-gradient-to-b from-brand-midnight to-brand-navy flex flex-col`}
       >
         {/* Header */}
         <header
-          className="text-white bg-[#001669] shadow-lg h-[25vh]"
+          className="text-white bg-brand-navy shadow-lg h-[25vh]"
           style={{
             backgroundImage: `url(/images/blue-fish.png)`,
             backgroundBlendMode: "multiply",
@@ -42,7 +42,7 @@ export default function RootLayout({
           <div className="h-full w-full container mx-auto px-4 py-8">
             <div className="h-full w-full flex justify-center items-center text-center space-y-4">
               <h1
-                className="text-4xl font-bold text-[#BC0000]"
+                className="text-4xl font-bold text-brand-red"
                 style={{ fontFamily: "Ibarra Real Nova, serif" }}
               >
                 Diksyonè Ayisyen
@@ -50,9 +50,10 @@ export default function RootLayout({
             </div>
           </div>
         </header>
+
         {children}
         {/* Footer */}
-        <footer className="bg-[#001669] text-white">
+        <footer className="text-brand-red mt-auto">
           <div className="container mx-auto px-4 py-8">
             <div className="text-center space-y-4">
               <p className="text-lg">Fèt ak renmen pou kominote Ayisyen an</p>

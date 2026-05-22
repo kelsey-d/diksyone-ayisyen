@@ -5,6 +5,7 @@ import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader } from "./ui/card";
 import { PoemExample } from "./PoemExample";
 import { Translation } from "../data/dictionary-data";
+import { Badge } from "./ui/badge";
 
 interface DictionaryEntryProps {
   translation: Translation;
@@ -23,7 +24,14 @@ export function DictionaryEntry({ translation }: DictionaryEntryProps) {
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <div className="space-y-1">
-            <h3 className="text-2xl font-bold text-[#00209F]">{translation.english}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-2xl font-bold text-[#00209F]">{translation.english}</h3>
+              {translation.part_of_speech && (
+                <Badge variant="secondary" className="bg-[#00209F]/10 text-[#00209F] border-[#00209F]/20">
+                  {translation.part_of_speech}
+                </Badge>
+              )}
+            </div>
             <div className="flex items-center gap-3">
               <span className="text-3xl font-bold text-[#CE1126]">{translation.creole}</span>
               <Button

@@ -7,11 +7,15 @@ import { supabase } from "./supabase";
 import { revalidatePath } from "next/cache";
 
 // Define schema for the Linguist
-const translationSchema = z.object({
+const senseSchema = z.object({
   english: z.string(),
   creole: z.string(),
   pronunciation: z.string(),
   part_of_speech: z.string(),
+});
+
+const translationSchema = z.object({
+  senses: z.array(senseSchema),
 });
 
 interface Poem {
@@ -31,10 +35,9 @@ export async function getTranslation(word: string) {
   const { data: existing } = await supabase
     .from('translations')
     .select(`*, poems (*)`)
-    .or(`english.ilike.${normalizedWord},creole.ilike.${normalizedWord}`)
-    .maybeSingle();
+    .or(`english.ilike.${normalizedWord},creole.ilike.${normalizedWord}`);
 
-  if (existing) {
+  if (existing && existing.length > 0) {
     console.log("[getTranslation] Found in database");
     return { data: existing, source: 'database' };
   }
@@ -45,80 +48,97 @@ export async function getTranslation(word: string) {
   }
 
   try {
-    // 2. THE LINGUIST: Get core translation data
-    console.log("[getTranslation] Consulting Linguist for translation...");
+    // 2. THE LINGUIST: Get multiple core translation senses
+    console.log("[getTranslation] Consulting Linguist for translation senses...");
     const result = await generateText({
       model: groq("meta-llama/llama-4-scout-17b-16e-instruct"),
       output: Output.object({
         schema: translationSchema
       }),
       system: `You are an expert Haitian Creole linguist. 
-               Provide the English-Creole translation, part of speech, and pronunciation.
-               - Respond in valid JSON matching the schema.
-               - Keep the case lowercase.`,
+               Identify all common grammatical senses (noun, verb, adjective, etc.) for the given word.
+               - Provide the English-Creole translation, part of speech, and pronunciation for each sense.
+               - Respond in valid JSON matching the schema (an object containing a 'senses' array).
+               - IMPORTANT: Use bare word forms for English. NEVER include the particle "to " before verbs. 
+                 Example: use "plant" instead of "to plant", "fight" instead of "to fight".
+               - IMPORTANT: Keep all text lowercase.`,
       prompt: `Translate the word: "${normalizedWord}"`,
     });
 
-    const coreData = result.output;
-    console.log("[getTranslation] Linguist returned:", coreData.creole);
+    console.dir("[getTranslation] Linguist response received.", result);
+    const senses = result.output.senses.map((s: any) => ({
+      ...s,
+      english: s.english.toLowerCase().replace(/^to\s+/i, '').trim(),
+      creole: s.creole.toLowerCase().trim()
+    }));
+    console.log(`[getTranslation] Linguist returned ${senses.length} senses.`);
 
-    // 3. Search local poem archive for the CREOLE translation
-    console.log(`[getTranslation] Searching for poems containing: "${coreData.creole}"`);
-    const { data } = await supabase
-      .from('poems')
-      .select('*')
-      .ilike('content', `%${coreData.creole}%`)
-      .limit(1)
-      .maybeSingle();
-    
-    const matchedPoem = data as Poem | null;
+    const savedResults = [];
 
-    let exampleSentence = null;
-    let poemId = null;
-
-    if (matchedPoem) {
-      console.log(`[getTranslation] Match found in poem: ${matchedPoem.title}`);
-      poemId = matchedPoem.id;
+    for (const coreData of senses) {
+      // 3. Search local poem archive for each CREOLE translation
+      console.log(`[getTranslation] Searching for poems containing: "${coreData.creole}"`);
+      const { data } = await supabase
+        .from('poems')
+        .select('*')
+        .ilike('content', `%${coreData.creole}%`)
+        .limit(1)
+        .maybeSingle();
       
-      const lines = matchedPoem.content.split(/\r?\n/);
-      const searchWord = coreData.creole.toLowerCase();
+      const matchedPoem = data as Poem | null;
 
-      // Find the specific line containing the word as a whole word
-      exampleSentence = lines.find(line => {
-        const regex = new RegExp(`\\b${searchWord}\\b`, 'i');
-        return regex.test(line);
-      })?.trim() || lines.find(line => line.toLowerCase().includes(searchWord))?.trim() || null;
-    }
+      let exampleSentence = null;
+      let poemId = null;
 
-    // 4. Save to database
-    const { data: savedTranslation, error: saveError } = await supabase
-      .from('translations')
-      .insert({
-        english: coreData.english.toLowerCase(),
-        creole: coreData.creole.toLowerCase(),
-        pronunciation: coreData.pronunciation,
-        part_of_speech: coreData.part_of_speech,
-        example_sentence: exampleSentence,
-        poem_id: poemId
-      })
-      .select(`*, poems (*)`)
-      .single();
+      if (matchedPoem) {
+        console.log(`[getTranslation] Match found in poem: ${matchedPoem.title}`);
+        poemId = matchedPoem.id;
+        
+        const lines = matchedPoem.content.split(/\r?\n/);
+        const searchWord = coreData.creole.toLowerCase();
 
-    if (saveError) {
-      if (saveError.code === '23505') {
-        const { data: refetch } = await supabase
-          .from('translations')
-          .select('*, poems(*)')
-          .eq('english', coreData.english.toLowerCase())
-          .single();
-        return { data: refetch, source: 'database' };
+        // Find the specific line containing the word as a whole word
+        exampleSentence = lines.find(line => {
+          const regex = new RegExp(`\\b${searchWord}\\b`, 'i');
+          return regex.test(line);
+        })?.trim() || lines.find(line => line.toLowerCase().includes(searchWord))?.trim() || null;
       }
-      throw saveError;
+
+      // 4. Save to database
+      const { data: savedTranslation, error: saveError } = await supabase
+        .from('translations')
+        .insert({
+          english: coreData.english.toLowerCase(),
+          creole: coreData.creole.toLowerCase(),
+          pronunciation: coreData.pronunciation,
+          part_of_speech: coreData.part_of_speech,
+          example_sentence: exampleSentence,
+          poem_id: poemId
+        })
+        .select(`*, poems (*)`)
+        .single();
+
+      if (saveError) {
+        // If it's a conflict, just skip or refetch
+        if (saveError.code === '23505') {
+          const { data: refetch } = await supabase
+            .from('translations')
+            .select('*, poems(*)')
+            .eq('english', coreData.english.toLowerCase())
+            .eq('creole', coreData.creole.toLowerCase())
+            .single();
+          if (refetch) savedResults.push(refetch);
+          continue;
+        }
+        throw saveError;
+      }
+      
+      if (savedTranslation) savedResults.push(savedTranslation);
     }
 
-    console.log("[getTranslation] Successfully saved to database.");
+    console.log("[getTranslation] Successfully processed all senses.");
     revalidatePath(`/translate/${word}`);
-    return { data: savedTranslation, source: 'ai' };
+    return { data: savedResults, source: 'ai' };
 
   } catch (error) {
     console.error("[getTranslation] Error:", error);

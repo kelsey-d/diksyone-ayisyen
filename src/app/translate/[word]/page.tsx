@@ -14,7 +14,7 @@ export default function TranslationPage() {
   const word = params.word as string;
   const decodedWord = decodeURIComponent(word).toLowerCase();
 
-  const [result, setResult] = useState<Translation | null>(null);
+  const [results, setResults] = useState<Translation[]>([]);
   const [loading, setLoading] = useState(true);
   const [source, setSource] = useState<'database' | 'ai' | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -27,19 +27,21 @@ export default function TranslationPage() {
       if (res.error) {
         setError(res.error);
       } else if (res.data) {
-        // Map database result to the Translation interface
-        const item = res.data;
-        setResult({
+        // Map database results to the Translation interface
+        const items = Array.isArray(res.data) ? res.data : [res.data];
+        const formattedResults = items.map((item: any) => ({
           english: item.english,
           creole: item.creole,
-          phonetic: item.pronunciation,
+          phonetic: item.pronunciation || item.phonetic,
+          part_of_speech: item.part_of_speech,
           poemExample: {
             line: item.example_sentence,
             poemTitle: item.poems?.title || 'Unknown',
             author: item.poems?.author || 'Unknown',
             fullPoem: item.poems?.content || ''
           }
-        });
+        }));
+        setResults(formattedResults);
         setSource(res.source as any);
       }
       setLoading(false);
@@ -50,16 +52,18 @@ export default function TranslationPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-24 flex flex-col items-center justify-center space-y-6 text-white flex-1">
-        <div className="relative">
-          <Loader2 className="h-16 w-16 text-[#CE1126] animate-spin" />
-          <Sparkles className="absolute -top-2 -right-2 h-6 w-6 text-[#00209F] animate-pulse" />
-        </div>
-        <div className="text-center space-y-2">
-          <h2 className="text-2xl font-bold">Searching for "{decodedWord}"</h2>
-          <p className="text-slate-400 max-w-sm">
-            We are looking through our archives. If the word isn't there, our AI lexicographer will generate a new entry with literary context...
-          </p>
+      <div className="flex-1 bg-brand-muted-blue">
+        <div className="container mx-auto px-4 py-24 flex flex-col items-center justify-center space-y-6 text-white flex-1">
+          <div className="relative">
+            <Loader2 className="h-16 w-16 text-[#CE1126] animate-spin" />
+            <Sparkles className="absolute -top-2 -right-2 h-6 w-6 text-[#00209F] animate-pulse" />
+          </div>
+          <div className="text-center space-y-2">
+            <h2 className="text-2xl font-bold">Researching "{decodedWord}"</h2>
+            <p className="text-slate-400 max-w-sm">
+              Our linguists are identifying grammatical senses and searching for literary context...
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -82,7 +86,7 @@ export default function TranslationPage() {
         </h2>
         {source === 'ai' && (
           <span className="text-xs bg-[#00209F] text-white px-3 py-1 rounded-full flex items-center gap-1 border border-white/20">
-            <Sparkles className="h-3 w-3" /> New entry added by AI
+            <Sparkles className="h-3 w-3" /> New entries added by AI
           </span>
         )}
       </div>
@@ -94,9 +98,15 @@ export default function TranslationPage() {
             <p className="text-slate-300">{error}</p>
           </div>
         </div>
-      ) : result && (
-        <div className="max-w-2xl mx-auto">
-          <DictionaryEntry translation={result} />
+      ) : results.length > 0 ? (
+        <div className="max-w-2xl mx-auto space-y-8">
+          {results.map((result, index) => (
+            <DictionaryEntry key={`${result.creole}-${index}`} translation={result} />
+          ))}
+        </div>
+      ) : (
+        <div className="container mx-auto px-4 py-12 text-center text-white">
+          <p>No results found.</p>
         </div>
       )}
     </div>

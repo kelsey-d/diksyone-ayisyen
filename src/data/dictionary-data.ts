@@ -2,6 +2,7 @@ export interface Translation {
   english: string;
   creole: string;
   phonetic: string;
+  part_of_speech?: string;
   poemExample: {
     line: string;
     poemTitle: string;

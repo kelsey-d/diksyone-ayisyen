@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { getTranslation } from "@/lib/actions";
+import { getTranslation, TranslationResult } from "@/lib/actions";
 import { DictionaryEntry } from "@/components/DictionaryEntry";
 import { Translation } from "@/data/dictionary-data";
 import { Loader2, Sparkles, ArrowLeft } from "lucide-react";
@@ -16,7 +16,7 @@ export default function TranslationPage() {
 
   const [results, setResults] = useState<Translation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [source, setSource] = useState<'database' | 'ai' | null>(null);
+  const [source, setSource] = useState<"database" | "ai" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -28,21 +28,21 @@ export default function TranslationPage() {
         setError(res.error);
       } else if (res.data) {
         // Map database results to the Translation interface
-        const items = Array.isArray(res.data) ? res.data : [res.data];
-        const formattedResults = items.map((item: any) => ({
+        const items: TranslationResult[] = res.data;
+        const formattedResults: Translation[] = items.map((item) => ({
           english: item.english,
           creole: item.creole,
-          phonetic: item.pronunciation || item.phonetic,
+          phonetic: item.pronunciation,
           part_of_speech: item.part_of_speech,
           poemExample: {
-            line: item.example_sentence,
-            poemTitle: item.poems?.title || 'Unknown',
-            author: item.poems?.author || 'Unknown',
-            fullPoem: item.poems?.content || ''
-          }
+            line: item.example_sentence || "",
+            poemTitle: item.poems?.title || "Unknown",
+            author: item.poems?.author || "Unknown",
+            fullPoem: item.poems?.content || "",
+          },
         }));
         setResults(formattedResults);
-        setSource(res.source as any);
+        setSource(res.source as "database" | "ai" | null);
       }
       setLoading(false);
     }
@@ -52,18 +52,19 @@ export default function TranslationPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 bg-brand-muted-blue">
-        <div className="container mx-auto px-4 py-24 flex flex-col items-center justify-center space-y-6 text-white flex-1">
-          <div className="relative">
-            <Loader2 className="h-16 w-16 text-[#CE1126] animate-spin" />
-            <Sparkles className="absolute -top-2 -right-2 h-6 w-6 text-[#00209F] animate-pulse" />
-          </div>
-          <div className="text-center space-y-2">
-            <h2 className="text-2xl font-bold">Researching "{decodedWord}"</h2>
-            <p className="text-slate-400 max-w-sm">
-              Our linguists are identifying grammatical senses and searching for literary context...
-            </p>
-          </div>
+      <div className="container mx-auto px-4 py-24 flex flex-col items-center justify-center space-y-6 text-white flex-1">
+        <div className="relative">
+          <Loader2 className="h-16 w-16 text-[#CE1126] animate-spin" />
+          <Sparkles className="absolute -top-2 -right-2 h-6 w-6 text-white animate-pulse" />
+        </div>
+        <div className="text-center space-y-2">
+          <h2 className="text-2xl font-bold">
+            Researching &quot;{decodedWord}&quot;
+          </h2>
+          <p className="text-slate-400 max-w-sm">
+            Our linguists are identifying grammatical senses and searching for
+            literary context...
+          </p>
         </div>
       </div>
     );
@@ -73,7 +74,10 @@ export default function TranslationPage() {
     <div className="container mx-auto px-4 py-8 space-y-6 flex-1">
       <div className="max-w-2xl mx-auto w-full">
         <Link href="/" passHref>
-          <Button variant="ghost" className="text-white hover:text-[#CE1126] hover:bg-white/10 mb-4 p-0">
+          <Button
+            variant="ghost"
+            className="text-white hover:text-[#CE1126] hover:bg-white/10 mb-4 p-0"
+          >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to search
           </Button>
@@ -82,9 +86,9 @@ export default function TranslationPage() {
 
       <div className="flex flex-col items-center space-y-2">
         <h2 className="text-2xl font-bold text-white text-center">
-          Results for: "{decodedWord}"
+          Results for: &quot;{decodedWord}&quot;
         </h2>
-        {source === 'ai' && (
+        {source === "ai" && (
           <span className="text-xs bg-[#00209F] text-white px-3 py-1 rounded-full flex items-center gap-1 border border-white/20">
             <Sparkles className="h-3 w-3" /> New entries added by AI
           </span>
@@ -101,7 +105,10 @@ export default function TranslationPage() {
       ) : results.length > 0 ? (
         <div className="max-w-2xl mx-auto space-y-8">
           {results.map((result, index) => (
-            <DictionaryEntry key={`${result.creole}-${index}`} translation={result} />
+            <DictionaryEntry
+              key={`${result.creole}-${index}`}
+              translation={result}
+            />
           ))}
         </div>
       ) : (

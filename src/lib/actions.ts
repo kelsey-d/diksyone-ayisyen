@@ -1,7 +1,7 @@
 "use server";
 
 import { generateText, Output } from "ai";
-import { groq, type GroqLanguageModelOptions } from "@ai-sdk/groq";
+import { groq } from "@ai-sdk/groq";
 import { z } from "zod";
 import { supabase } from "./supabase";
 import { revalidatePath } from "next/cache";
@@ -18,7 +18,7 @@ const translationSchema = z.object({
   senses: z.array(senseSchema),
 });
 
-interface Poem {
+export interface Poem {
   id: string;
   title: string;
   author: string;
@@ -26,20 +26,41 @@ interface Poem {
   created_at?: string;
 }
 
-export async function getTranslation(word: string) {
+export interface Sense {
+  english: string;
+  creole: string;
+  pronunciation: string;
+  part_of_speech: string;
+}
+
+export interface TranslationResult {
+  english: string;
+  creole: string;
+  pronunciation: string;
+  part_of_speech: string;
+  example_sentence: string | null;
+  poem_id: string | null;
+  poems: Poem | null;
+}
+
+export async function getTranslation(word: string): Promise<{ data?: TranslationResult[], source?: string, error?: string }> {
   const normalizedWord = word.trim().toLowerCase();
 
   console.log(`[getTranslation] Searching for: ${normalizedWord}`);
 
   // 1. Try to find the translation in the database
-  const { data: existing } = await supabase
+  const { data: existing, error: fetchError } = await supabase
     .from('translations')
     .select(`*, poems (*)`)
     .or(`english.ilike.${normalizedWord},creole.ilike.${normalizedWord}`);
 
+  if (fetchError) {
+    console.error("[getTranslation] Fetch error:", fetchError);
+  }
+
   if (existing && existing.length > 0) {
     console.log("[getTranslation] Found in database");
-    return { data: existing, source: 'database' };
+    return { data: existing as TranslationResult[], source: 'database' };
   }
 
   if (!process.env.GROQ_API_KEY) {
@@ -65,15 +86,14 @@ export async function getTranslation(word: string) {
       prompt: `Translate the word: "${normalizedWord}"`,
     });
 
-    console.dir("[getTranslation] Linguist response received.", result);
-    const senses = result.output.senses.map((s: any) => ({
+    const senses: Sense[] = result.output.senses.map((s: Sense) => ({
       ...s,
       english: s.english.toLowerCase().replace(/^to\s+/i, '').trim(),
       creole: s.creole.toLowerCase().trim()
     }));
     console.log(`[getTranslation] Linguist returned ${senses.length} senses.`);
 
-    const savedResults = [];
+    const savedResults: TranslationResult[] = [];
 
     for (const coreData of senses) {
       // 3. Search local poem archive for each CREOLE translation
@@ -127,13 +147,13 @@ export async function getTranslation(word: string) {
             .eq('english', coreData.english.toLowerCase())
             .eq('creole', coreData.creole.toLowerCase())
             .single();
-          if (refetch) savedResults.push(refetch);
+          if (refetch) savedResults.push(refetch as TranslationResult);
           continue;
         }
         throw saveError;
       }
       
-      if (savedTranslation) savedResults.push(savedTranslation);
+      if (savedTranslation) savedResults.push(savedTranslation as TranslationResult);
     }
 
     console.log("[getTranslation] Successfully processed all senses.");
@@ -146,7 +166,7 @@ export async function getTranslation(word: string) {
   }
 }
 
-export async function getWordOfTheDay() {
+export async function getWordOfTheDay(): Promise<{ data?: { english: string, creole: string }, error?: string }> {
   try {
     const today = new Date();
     const startOfToday = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())).toISOString();

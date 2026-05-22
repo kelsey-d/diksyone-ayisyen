@@ -91,7 +91,7 @@ export function PoemExample({ line, poemTitle, author, fullPoem }: PoemExamplePr
       <div className="space-y-3">
         <div className="flex items-start justify-between gap-2">
           <blockquote className="text-lg italic text-[#00209F] flex-1">
-            "{line}"
+            &quot;{line}&quot;
           </blockquote>
           <Button
             variant="ghost"

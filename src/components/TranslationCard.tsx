@@ -8,12 +8,6 @@ interface TranslationCardProps {
 }
 
 export function TranslationCard({ english, creole, date }: TranslationCardProps) {
-  const currentDate = new Date().toLocaleDateString('ht-HT', { 
-    day: 'numeric',
-    month: 'long', 
-    year: 'numeric' 
-  });
-
   return (
     <Card className="bg-slate-200 p-4 space-y-3">
       {date && (

@@ -168,40 +168,30 @@ export async function getTranslation(word: string): Promise<{ data?: Translation
 
 export async function getWordOfTheDay(): Promise<{ data?: { english: string, creole: string }, error?: string }> {
   try {
-    const today = new Date();
-    const startOfToday = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())).toISOString();
-    const endOfToday = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + 1)).toISOString();
-
-    const { data: existingWord, error: fetchError } = await supabase
+    const { data: allWords, error: fetchError } = await supabase
       .from('translations')
-      .select('english, creole')
-      .gte('word_of_day', startOfToday)
-      .lt('word_of_day', endOfToday)
-      .maybeSingle();
+      .select('english, creole');
 
     if (fetchError) throw fetchError;
 
-    if (existingWord) {
-      return { data: existingWord };
-    } else {
-      const { data: allWords, error: allWordsError } = await supabase
-        .from('translations')
-        .select('id, english, creole');
-
-      if (allWordsError) throw allWordsError;
-
-      if (allWords && allWords.length > 0) {
-        const randomIndex = Math.floor(Math.random() * allWords.length);
-        const selected = allWords[randomIndex];
-
-        await supabase
-          .from('translations')
-          .update({ word_of_day: startOfToday })
-          .eq('id', selected.id);
-
-        return { data: { english: selected.english, creole: selected.creole } };
+    if (allWords && allWords.length > 0) {
+      // Use today's date string (YYYY-MM-DD) as a seed
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Simple hash function to turn the date string into a consistent number
+      let hash = 0;
+      for (let i = 0; i < today.length; i++) {
+        hash = ((hash << 5) - hash) + today.charCodeAt(i);
+        hash |= 0; // Convert to 32bit integer
       }
+
+      // Use the absolute hash to pick a consistent index
+      const randomIndex = Math.abs(hash) % allWords.length;
+      const selected = allWords[randomIndex];
+
+      return { data: { english: selected.english, creole: selected.creole } };
     }
+    
     return { error: "No words available" };
   } catch (err) {
     console.error("Error in getWordOfTheDay action:", err);

@@ -1,16 +1,39 @@
-name: Keep Supabase Alive
+name: Keep Supabase Alive & Verify Data
 on:
   schedule:
-    # Runs every 3 days at noon UTC
-    - cron: "0 12 */3 * *"
-  workflow_dispatch: # Allows you to run it manually from the GitHub UI
+    # Runs twice daily at 00:00 and 12:00 UTC
+    - cron: "0 0,12 * * *"
+  workflow_dispatch: # Allows manual trigger from the GitHub UI
 
 jobs:
-  ping:
+  ping-and-verify:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase API
+      - name: Fetch and Verify Translations Table
         run: |
-          curl -X GET "${{ secrets.SUPABASE_API_URL }}" \
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X GET \
+            "${{ secrets.SUPABASE_API_URL }}/rest/v1/translations?select=*" \
             -H "apikey: ${{ secrets.SUPABASE_API_KEY }}" \
-            --fail --silent --show-error
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_API_KEY }}")
+
+          HTTP_BODY=$(echo "$RESPONSE" | sed -e '$d')
+          HTTP_STATUS=$(echo "$RESPONSE" | tail -n1 | cut -d':' -f2)
+
+          echo "HTTP Status: $HTTP_STATUS"
+
+          if [ "$HTTP_STATUS" -lt 200 ] || [ "$HTTP_STATUS" -ge 300 ]; then
+            echo "Error: Failed to query translations table (HTTP $HTTP_STATUS)"
+            echo "Response: $HTTP_BODY"
+            exit 1
+          fi
+
+          # Verification step
+          TOTAL_ROWS=$(echo "$HTTP_BODY" | jq '. | length' 2>/dev/null || echo "0")
+          echo "Successfully retrieved $TOTAL_ROWS translation entries."
+
+          if [ "$TOTAL_ROWS" -eq 0 ]; then
+            echo "Warning: Translations table returned 0 records or invalid JSON."
+          else
+            echo "Sample record verified:"
+            echo "$HTTP_BODY" | jq '.[0]'
+          fi

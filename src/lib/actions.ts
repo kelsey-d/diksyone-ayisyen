@@ -12,6 +12,7 @@ const senseSchema = z.object({
   creole: z.string(),
   pronunciation: z.string(),
   part_of_speech: z.string(),
+  example_sentence: z.string(),
 });
 
 const translationSchema = z.object({
@@ -31,6 +32,7 @@ export interface Sense {
   creole: string;
   pronunciation: string;
   part_of_speech: string;
+  example_sentence: string;
 }
 
 export interface TranslationResult {
@@ -69,62 +71,35 @@ export async function getTranslation(word: string): Promise<{ data?: Translation
   }
 
   try {
-    // 2. THE LINGUIST: Get multiple core translation senses
+    // 2. THE LINGUIST: Get multiple core translation senses with tailored example sentences
     console.log("[getTranslation] Consulting Linguist for translation senses...");
     const result = await generateText({
-      model: groq("meta-llama/llama-4-scout-17b-16e-instruct"),
+      model: groq("openai/gpt-oss-120b"),
       output: Output.object({
         schema: translationSchema
       }),
       system: `You are an expert Haitian Creole linguist. 
                Identify all common grammatical senses (noun, verb, adjective, etc.) for the given word.
-               - Provide the English-Creole translation, part of speech, and pronunciation for each sense.
+               - Provide the English-Creole translation, part of speech, pronunciation, and an authentic Haitian Creole example sentence demonstrating the word used specifically in this grammatical sense.
                - Respond in valid JSON matching the schema (an object containing a 'senses' array).
                - IMPORTANT: Use bare word forms for English. NEVER include the particle "to " before verbs. 
                  Example: use "plant" instead of "to plant", "fight" instead of "to fight".
-               - IMPORTANT: Keep all text lowercase.`,
+               - IMPORTANT: Keep english, creole, and part of speech text lowercase. The example_sentence should be a natural sentence in Haitian Creole with proper capitalization and punctuation.`,
       prompt: `Translate the word: "${normalizedWord}"`,
     });
 
     const senses: Sense[] = result.output.senses.map((s: Sense) => ({
       ...s,
       english: s.english.toLowerCase().replace(/^to\s+/i, '').trim(),
-      creole: s.creole.toLowerCase().trim()
+      creole: s.creole.toLowerCase().trim(),
+      example_sentence: s.example_sentence.trim()
     }));
     console.log(`[getTranslation] Linguist returned ${senses.length} senses.`);
 
     const savedResults: TranslationResult[] = [];
 
     for (const coreData of senses) {
-      // 3. Search local poem archive for each CREOLE translation
-      console.log(`[getTranslation] Searching for poems containing: "${coreData.creole}"`);
-      const { data } = await supabase
-        .from('poems')
-        .select('*')
-        .ilike('content', `%${coreData.creole}%`)
-        .limit(1)
-        .maybeSingle();
-      
-      const matchedPoem = data as Poem | null;
-
-      let exampleSentence = null;
-      let poemId = null;
-
-      if (matchedPoem) {
-        console.log(`[getTranslation] Match found in poem: ${matchedPoem.title}`);
-        poemId = matchedPoem.id;
-        
-        const lines = matchedPoem.content.split(/\r?\n/);
-        const searchWord = coreData.creole.toLowerCase();
-
-        // Find the specific line containing the word as a whole word
-        exampleSentence = lines.find(line => {
-          const regex = new RegExp(`\\b${searchWord}\\b`, 'i');
-          return regex.test(line);
-        })?.trim() || lines.find(line => line.toLowerCase().includes(searchWord))?.trim() || null;
-      }
-
-      // 4. Save to database
+      // 3. Save each sense with its generated example sentence to the database
       const { data: savedTranslation, error: saveError } = await supabase
         .from('translations')
         .insert({
@@ -132,8 +107,8 @@ export async function getTranslation(word: string): Promise<{ data?: Translation
           creole: coreData.creole.toLowerCase(),
           pronunciation: coreData.pronunciation,
           part_of_speech: coreData.part_of_speech,
-          example_sentence: exampleSentence,
-          poem_id: poemId
+          example_sentence: coreData.example_sentence,
+          poem_id: null
         })
         .select(`*, poems (*)`)
         .single();

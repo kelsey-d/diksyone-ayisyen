@@ -5,9 +5,9 @@ export interface Translation {
   part_of_speech?: string;
   poemExample: {
     line: string;
-    poemTitle: string;
-    author: string;
-    fullPoem: string;
+    poemTitle?: string;
+    author?: string;
+    fullPoem?: string;
   };
 }
 

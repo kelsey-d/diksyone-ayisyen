@@ -36,9 +36,9 @@ export default function TranslationPage() {
           part_of_speech: item.part_of_speech,
           poemExample: {
             line: item.example_sentence || "",
-            poemTitle: item.poems?.title || "Unknown",
-            author: item.poems?.author || "Unknown",
-            fullPoem: item.poems?.content || "",
+            poemTitle: item.poems?.title,
+            author: item.poems?.author,
+            fullPoem: item.poems?.content,
           },
         }));
         setResults(formattedResults);

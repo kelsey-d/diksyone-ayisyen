@@ -27,4 +27,4 @@ pnpm dev
 
 - Caching layer in front of database
 - More natural voice for playback
-- MEthod to verify AI generated entries
+- Method to verify AI generated entries

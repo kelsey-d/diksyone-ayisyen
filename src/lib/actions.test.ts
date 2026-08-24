@@ -32,23 +32,19 @@ describe('getTranslation', () => {
     process.env.GROQ_API_KEY = 'mock-key';
   });
 
-  it('should return multiple senses for the word "fight"', async () => {
+  it('should return multiple senses for the word "fight" with generated example sentences', async () => {
     // 1. Mock DB check (not found)
     const mockOr = vi.fn().mockResolvedValue({ data: null });
     const mockSelectExisting = vi.fn().mockReturnValue({ or: mockOr });
     
-    // 2. Mock Poem check (not found)
-    const mockMaybeSinglePoem = vi.fn().mockResolvedValue({ data: null });
-    const mockLimit = vi.fn().mockReturnValue({ maybeSingle: mockMaybeSinglePoem });
-    const mockIlike = vi.fn().mockReturnValue({ limit: mockLimit });
-    const mockSelectPoem = vi.fn().mockReturnValue({ ilike: mockIlike });
-
-    // 3. Mock Insert
+    // 2. Mock Insert
     const mockSingleInsert = vi.fn().mockResolvedValue({
       data: {
         english: 'fight',
         creole: 'batay',
         part_of_speech: 'noun',
+        example_sentence: 'Batay la te rèd anpil.',
+        poem_id: null,
         poems: null
       }
     });
@@ -59,13 +55,10 @@ describe('getTranslation', () => {
       if (table === 'translations') {
         return { select: mockSelectExisting, insert: mockInsert };
       }
-      if (table === 'poems') {
-        return { select: mockSelectPoem };
-      }
       return {};
     });
 
-    // 4. Mock AI returning multiple senses
+    // 3. Mock AI returning multiple senses with example sentences
     (generateText as Mock).mockResolvedValueOnce({
       output: {
         senses: [
@@ -74,12 +67,14 @@ describe('getTranslation', () => {
             creole: 'batay',
             pronunciation: 'ba-tay',
             part_of_speech: 'noun',
+            example_sentence: 'Batay la te rèd anpil.',
           },
           {
             english: 'fight',
             creole: 'goumen',
             pronunciation: 'gou-men',
             part_of_speech: 'verb',
+            example_sentence: 'Yo te goumen pou dwa yo.',
           },
         ],
       }
@@ -91,6 +86,7 @@ describe('getTranslation', () => {
     expect(result.data).toHaveLength(2);
     if (result.data) {
         expect((result.data as TranslationResult[])[0].creole).toBe('batay');
+        expect((result.data as TranslationResult[])[0].example_sentence).toBe('Batay la te rèd anpil.');
     }
   });
 });
